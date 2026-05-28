@@ -39,8 +39,8 @@ list_remotes() {
 
 raw_target=$({
   list_local_sessions | awk 'NF {printf "\033[36m%s\033[0m\n", $0}'
-  zoxide query -l       | awk 'NF {printf "\033[34m%s\033[0m\n", $0}'
   list_remotes          | awk 'NF {printf "\033[35m%s\033[0m\n", $0}'
+  zoxide query -l       | awk 'NF {printf "\033[34m%s\033[0m\n", $0}'
 } | awk '!seen[$0]++' | gum filter --no-strip-ansi --placeholder 'Pick a session, project, or remote...')
 
 # Exit if nothing was selected (user pressed Esc).
