@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# zj — fuzzy-pick a zellij session, a zoxide directory, or a remote web session.
+#
+# Sources merged into the picker:
+#   - active local zellij sessions          (cyan)
+#   - zoxide-tracked directories            (blue)
+#   - configured remote web sessions        (magenta)  e.g. https://zellij.kjaymiller.dev/homelab
+#
+# Remote sessions are attached with `zellij attach <url> --token ...`. The token
+# is resolved via fnox (which can serve it from 1Password); if fnox has no value
+# you are prompted, and may cache it back into fnox.
+#
+# Config (all optional, via env):
+#   ZJ_REMOTES_FILE  path to a newline-separated list of remote session URLs
+#                    (default: ${XDG_CONFIG_HOME:-~/.config}/zj/remotes)
+#   ZJ_TOKEN_KEY     fnox secret name holding the remote token
+#                    (default: ZELLIJ_WEB_TOKEN)
+#   ZJ_CA_CERT       path to a CA cert (PEM) for verifying the remote server.
+#                    If set and the file exists, passed as `--ca-cert`.
+
+set -uo pipefail
+
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/zj"
+REMOTES_FILE="${ZJ_REMOTES_FILE:-$CONFIG_DIR/remotes}"
+TOKEN_KEY="${ZJ_TOKEN_KEY:-ZELLIJ_WEB_TOKEN}"
+CA_CERT="${ZJ_CA_CERT:-}"
+
+# --- gather sources ------------------------------------------------------------
+
+list_local_sessions() {
+  zellij list-sessions -sn 2>/dev/null
+}
+
+list_remotes() {
+  [ -f "$REMOTES_FILE" ] || return 0
+  # Skip blank lines and comments (#).
+  grep -vE '^\s*(#|$)' "$REMOTES_FILE" 2>/dev/null
+}
+
+raw_target=$({
+  list_local_sessions | awk 'NF {printf "\033[36m%s\033[0m\n", $0}'
+  zoxide query -l       | awk 'NF {printf "\033[34m%s\033[0m\n", $0}'
+  list_remotes          | awk 'NF {printf "\033[35m%s\033[0m\n", $0}'
+} | awk '!seen[$0]++' | gum filter --no-strip-ansi --placeholder 'Pick a session, project, or remote...')
+
+# Exit if nothing was selected (user pressed Esc).
+[ -z "$raw_target" ] && exit 0
+
+# Strip ANSI codes from the selection.
+target=$(printf '%s' "$raw_target" | awk '{gsub(/\033\[[0-9;]*m/, ""); print}')
+
+# --- token handling (remote only) ---------------------------------------------
+
+get_token() {
+  local token
+  token="$(fnox get "$TOKEN_KEY" 2>/dev/null)"
+  if [ -n "$token" ]; then
+    printf '%s' "$token"
+    return 0
+  fi
+
+  token="$(gum input --password --placeholder "Token for $TOKEN_KEY")"
+  [ -z "$token" ] && return 1
+
+  if gum confirm "Cache this token via fnox ($TOKEN_KEY)?"; then
+    if printf '%s' "$token" | fnox set "$TOKEN_KEY" >/dev/null 2>&1; then
+      echo "Cached token in fnox as $TOKEN_KEY." >&2
+    else
+      echo "Could not cache token (is fnox.toml configured?). Continuing." >&2
+    fi
+  fi
+
+  printf '%s' "$token"
+}
+
+attach_remote() {
+  local url="$1" token
+  token="$(get_token)" || { echo "No token provided; aborting." >&2; exit 1; }
+
+  local args=("$url" --token "$token" --remember)
+  if [ -n "$CA_CERT" ] && [ -f "$CA_CERT" ]; then
+    args+=(--ca-cert "$CA_CERT")
+  fi
+
+  exec zellij attach "${args[@]}"
+}
+
+# --- dispatch ------------------------------------------------------------------
+
+if [[ "$target" =~ ^https?:// ]]; then
+  attach_remote "$target"
+
+elif list_local_sessions | grep -Fxq "$target"; then
+  if [[ -n "${ZELLIJ:-}" ]]; then
+    zellij pipe --plugin "https://github.com/mostafaqanbaryan/zellij-switch/releases/download/0.2.1/zellij-switch.wasm" -- "--session \"$target\""
+  else
+    exec zellij attach "$target"
+  fi
+
+elif [ -d "$target" ]; then
+  session_name="$(basename "$target")"
+  if [[ -n "${ZELLIJ:-}" ]]; then
+    target_abs="$(cd "$target" && pwd)"
+    # Bypass the zellij-switch plugin's flawed cwd handling by explicitly
+    # creating the session in the background from the correct directory first.
+    (cd "$target_abs" && zellij attach -c "$session_name" -b)
+    zellij pipe --plugin "https://github.com/mostafaqanbaryan/zellij-switch/releases/download/0.2.1/zellij-switch.wasm" -- "--session \"$session_name\""
+  else
+    exec zellij attach -c "$session_name" options --default-cwd "$target"
+  fi
+
+else
+  echo "Error: '$target' is neither a remote URL, an active session, nor a valid directory." >&2
+  exit 1
+fi

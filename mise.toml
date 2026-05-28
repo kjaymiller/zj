@@ -1,0 +1,13 @@
+[tools]
+zellij = "latest"
+zoxide = "latest"
+gum = "latest"
+fnox = "latest"
+
+[tasks.install]
+description = "Symlink zj into ~/.local/bin"
+run = "mkdir -p ~/.local/bin && ln -sf \"$PWD/zj\" ~/.local/bin/zj && echo 'Linked ~/.local/bin/zj -> '\"$PWD/zj\"'"
+
+[tasks.uninstall]
+description = "Remove the zj symlink"
+run = "rm -f ~/.local/bin/zj && echo 'Removed ~/.local/bin/zj'"

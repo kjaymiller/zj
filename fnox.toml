@@ -1,0 +1,15 @@
+# fnox configuration template for zj.
+#
+# Copy this to a location fnox will discover (this directory, a parent, or
+# ~/.config/fnox/config.toml via `fnox ... -g`) and adjust the 1Password
+# reference to point at your stored Zellij web token.
+#
+# This file holds NO secret values — only a reference to the 1Password item.
+# zj calls `fnox get ZELLIJ_WEB_TOKEN`, which resolves through this provider.
+
+[providers.op]
+type = "1password"
+vault = "default"
+
+[secrets]
+ZELLIJ_WEB_TOKEN = { provider = "op", value = "op://Private/Zellij Web/credential" }

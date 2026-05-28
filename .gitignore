@@ -1,0 +1,7 @@
+# Local fnox state / encrypted material, if any lands here.
+fnox.local.toml
+*.age
+.env
+
+# Personal remotes list (use remotes.example as the template).
+remotes
