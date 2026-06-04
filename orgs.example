@@ -1,0 +1,13 @@
+# GitHub owners/orgs to list in the picker, one per line. Lines starting with # are ignored.
+# Copy to ${XDG_CONFIG_HOME:-~/.config}/zj/orgs (or set $ZJ_ORGS_FILE).
+#
+# Each entry is a GitHub login — a user or an organization. zj fetches every
+# repo owned by these logins in a single GitHub GraphQL call (via gh) and shows
+# each as `gh:owner/repo` (green). Selecting one clones it into $ZJ_REPOS_DIR
+# (default ~/projects) if not already present, then opens a zellij session
+# there named after the repo.
+#
+# Requires `gh` to be installed and authenticated (`gh auth login`).
+
+kjaymiller
+zellij-org

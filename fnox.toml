@@ -4,8 +4,10 @@
 # ~/.config/fnox/config.toml via `fnox ... -g`) and adjust the 1Password
 # reference to point at your stored Zellij web token.
 #
-# This file holds NO secret values — only a reference to the 1Password item.
-# zj calls `fnox get ZELLIJ_WEB_TOKEN`, which resolves through this provider.
+# This file holds NO secret values — only references to the 1Password items.
+# zj calls `fnox get ZELLIJ_WEB_TOKEN` (remote sessions) and, optionally,
+# `fnox get GH_API_TOKEN` (the GitHub GraphQL repo listing), both resolved
+# through this provider.
 
 [providers.op]
 type = "1password"
@@ -13,3 +15,6 @@ vault = "default"
 
 [secrets]
 ZELLIJ_WEB_TOKEN = { provider = "op", value = "op://Private/Zellij Web/credential" }
+# Optional: a GitHub token (PAT) for listing org/owner repos. Omit to use gh's
+# own login instead.
+GH_API_TOKEN = { provider = "op", value = "op://Private/GitHub API/credential" }
