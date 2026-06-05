@@ -146,33 +146,6 @@ When you run `zj` from inside zellij, bind it to a **floating pane** so the pick
 overlays your current layout and tears itself down the moment you pick something.
 Add this to your zellij config (`~/.config/zellij/config.kdl`):
 
-```kdl
-keybinds {
-    shared_except "locked" {
-        bind "Ctrl y" {
-            Run "zj" {
-                floating true
-                close_on_exit true
-            }
-        }
-    }
-}
-```
-
-`close_on_exit true` is what makes cleanup seamless: `zj` switches your client to
-the chosen session and then exits, so the floating pane closes automatically once
-the switch has already moved your view away — no leftover picker pane, nothing to
-dismiss by hand. (You can't close the floating pane *before* switching — that
-would kill `zj` mid-run — but you don't need to: switch first, let the pane
-auto-close on exit.)
-
-### Launching from locked mode
-
-`shared_except "locked"` leaves the binding inactive in locked mode, so the key
-does nothing while locked. To make it work *from* locked mode, bind it inside a
-`locked` block and chain `SwitchToMode "Normal"` **before** `Run`. Zellij runs the
-actions in a `bind` block in order, so the unlock fires first and then `zj`
-launches:
 
 ```kdl
 keybinds {
@@ -191,6 +164,7 @@ keybinds {
 Keep this alongside the `shared_except "locked"` block above if you want the key
 to work in every mode: `shared_except` covers the unlocked modes, and the `locked`
 block adds the unlock-then-run behavior for that one mode.
+
 
 ## Environment variables
 
