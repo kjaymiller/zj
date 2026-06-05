@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # zj — fuzzy-pick a zellij session, a zoxide directory, or a remote web session.
 #
+# Usage:
+#   zj                 open the fuzzy picker over the sources below
+#   zj <target>        skip the picker and act on <target> directly. Handy for
+#                      repos that aren't in your configured orgs: pass a GitHub
+#                      URL (https://github.com/owner/repo or git@github.com:owner/repo)
+#                      or an owner/repo slug to clone and open it. <target> may
+#                      also be a remote URL, an active session name, or a dir.
+#
 # Sources merged into the picker:
 #   - active local zellij sessions          (cyan)
 #   - zoxide-tracked directories            (blue)
@@ -121,33 +129,47 @@ EOF
   fi
 }
 
-raw_target=$({
-  list_local_sessions | awk 'NF {printf "\033[36m%s\033[0m\n", $0}'
-  list_remotes          | awk 'NF {printf "\033[35m%s\033[0m\n", $0}'
-  zoxide query -l       | awk 'NF {printf "\033[34m%s\033[0m\n", $0}'
-  list_repos            | awk 'NF {printf "\033[32mgh:%s\033[0m\n", $0}'
-} | awk '!seen[$0]++' | gum filter --no-strip-ansi --placeholder 'Pick a session, project, remote, or repo...')
+# An explicit argument bypasses the picker — useful for a GitHub URL/slug or any
+# other target that isn't (or can't be) in the picker list.
+if [ "$#" -gt 0 ]; then
+  target="$1"
+else
+  raw_target=$({
+    list_local_sessions | awk 'NF {printf "\033[36m%s\033[0m\n", $0}'
+    list_remotes          | awk 'NF {printf "\033[35m%s\033[0m\n", $0}'
+    zoxide query -l       | awk 'NF {printf "\033[34m%s\033[0m\n", $0}'
+    list_repos            | awk 'NF {printf "\033[32mgh:%s\033[0m\n", $0}'
+  } | awk '!seen[$0]++' | fzf --ansi --layout=reverse \
+        --prompt='Pick a session, project, remote, or repo… ')
 
-# Exit if nothing was selected (user pressed Esc).
-[ -z "$raw_target" ] && exit 0
+  # Exit if nothing was selected (user pressed Esc).
+  [ -z "$raw_target" ] && exit 0
 
-# Strip ANSI codes from the selection.
-target=$(printf '%s' "$raw_target" | awk '{gsub(/\033\[[0-9;]*m/, ""); print}')
+  # fzf --ansi already drops the color codes from its output; strip again
+  # defensively so downstream matching never sees an escape sequence.
+  target=$(printf '%s' "$raw_target" | awk '{gsub(/\033\[[0-9;]*m/, ""); print}')
+fi
 
 # --- token handling (remote only) ---------------------------------------------
 
 get_token() {
-  local token
+  local token reply
   token="$(fnox get "$TOKEN_KEY" 2>/dev/null)"
   if [ -n "$token" ]; then
     printf '%s' "$token"
     return 0
   fi
 
-  token="$(gum input --password --placeholder "Token for $TOKEN_KEY")"
+  # This function's stdout *is* the token (it's captured by the caller), so the
+  # prompts and the typed reply go to the terminal directly via /dev/tty.
+  printf 'Token for %s: ' "$TOKEN_KEY" >/dev/tty
+  IFS= read -rs token </dev/tty
+  printf '\n' >/dev/tty
   [ -z "$token" ] && return 1
 
-  if gum confirm "Cache this token via fnox ($TOKEN_KEY)?"; then
+  printf 'Cache this token via fnox (%s)? [y/N] ' "$TOKEN_KEY" >/dev/tty
+  IFS= read -r reply </dev/tty
+  if [[ "$reply" == [Yy]* ]]; then
     if printf '%s' "$token" | fnox set "$TOKEN_KEY" >/dev/null 2>&1; then
       echo "Cached token in fnox as $TOKEN_KEY." >&2
     else
@@ -172,20 +194,84 @@ attach_remote() {
 
 # --- session / repo helpers ---------------------------------------------------
 
+# Create a detached zellij session whose working tab is rooted at $1 (absolute
+# dir) and named $2. The zellij server roots a session's *initial* pane at its
+# OWN cwd and ignores `--default-cwd` for it, so neither a `cd` here nor
+# `--default-cwd` sets the directory. `new-tab --cwd` is the only reliable way
+# to spawn a pane in a given dir, so we create the session, then add a tab that
+# is actually rooted there. The misrooted default tab is dropped later by
+# drop_default_tab (which only works once a client is attached).
+create_session_rooted() {
+  local dir_abs="$1" name="$2" _
+  zellij attach -c "$name" -b
+  # Wait for the server to register the new session before acting on it.
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    list_local_sessions | grep -Fxq "$name" && break
+    sleep 0.1
+  done
+  zellij --session "$name" action new-tab --cwd "$dir_abs" --name "$name"
+}
+
+# Close the stray default first tab left by create_session_rooted. Only effective
+# on a session the current client is attached to, and only if the rooted tab was
+# really added (so we never close the sole tab and kill the session). Best-effort.
+drop_default_tab() {
+  local name="$1"
+  if [ "$(zellij --session "$name" action dump-layout 2>/dev/null \
+            | grep -c 'tab name=')" -ge 2 ]; then
+    zellij --session "$name" action go-to-tab 1
+    zellij --session "$name" action close-tab
+  fi
+}
+
 # Open (or hot-switch to) a zellij session rooted at a directory.
 start_session_in_dir() {
-  local dir="$1" session_name
+  local dir="$1" session_name dir_abs
   session_name="$(basename "$dir")"
+  dir_abs="$(cd "$dir" && pwd)"
   if [[ -n "${ZELLIJ:-}" ]]; then
-    local dir_abs
-    dir_abs="$(cd "$dir" && pwd)"
-    # Bypass the zellij-switch plugin's flawed cwd handling by explicitly
-    # creating the session in the background from the correct directory first.
-    (cd "$dir_abs" && zellij attach -c "$session_name" -b)
-    zellij pipe --plugin "https://github.com/mostafaqanbaryan/zellij-switch/releases/download/0.2.1/zellij-switch.wasm" -- "--session \"$session_name\""
+    # The native `switch-session` (zellij 0.44+) only switches to a session that
+    # already exists — it won't create one — so create it first, then switch the
+    # client in. An existing session keeps its own dirs; only switch to it.
+    if ! list_local_sessions | grep -Fxq "$session_name"; then
+      create_session_rooted "$dir_abs" "$session_name"
+      zellij action switch-session "$session_name"
+      drop_default_tab "$session_name"
+    else
+      zellij action switch-session "$session_name"
+    fi
   else
-    exec zellij attach -c "$session_name" options --default-cwd "$dir"
+    if list_local_sessions | grep -Fxq "$session_name"; then
+      exec zellij attach "$session_name"
+    fi
+    # New session: root a tab at the dir, then attach. We can't drop the stray
+    # default tab here (no client is attached until we exec), but attaching lands
+    # the user on the correctly-rooted tab.
+    create_session_rooted "$dir_abs" "$session_name"
+    exec zellij attach "$session_name"
   fi
+}
+
+# If $1 is a GitHub repo URL (https or ssh/scp form), echo its `owner/repo` slug
+# and return 0; otherwise return 1. This is what lets a github.com URL be cloned
+# rather than treated as a remote zellij web session (both are https://).
+github_slug() {
+  local path="$1"
+  case "$path" in
+    https://github.com/*)   path="${path#https://github.com/}" ;;
+    http://github.com/*)    path="${path#http://github.com/}" ;;
+    ssh://git@github.com/*) path="${path#ssh://git@github.com/}" ;;
+    git@github.com:*)       path="${path#git@github.com:}" ;;
+    *) return 1 ;;
+  esac
+  path="${path%/}"      # drop a trailing slash
+  path="${path%.git}"   # drop a trailing .git
+  case "$path" in */*) ;; *) return 1 ;; esac   # need at least owner/repo
+  local owner="${path%%/*}" rest="${path#*/}" repo
+  repo="${rest%%/*}"    # first path segment after the owner (ignores /tree/… etc.)
+  repo="${repo%.git}"
+  [ -n "$owner" ] && [ -n "$repo" ] || return 1
+  printf '%s/%s' "$owner" "$repo"
 }
 
 # Clone a GitHub repo (if not already present), then open a session in it.
@@ -218,18 +304,26 @@ clone_and_start() {
 if [[ "$target" == gh:* ]]; then
   clone_and_start "${target#gh:}"
 
+elif gh_url_slug="$(github_slug "$target")"; then
+  # A github.com URL (or ssh form) — clone it like a gh:owner/repo entry.
+  clone_and_start "$gh_url_slug"
+
 elif [[ "$target" =~ ^https?:// ]]; then
   attach_remote "$target"
 
 elif list_local_sessions | grep -Fxq "$target"; then
   if [[ -n "${ZELLIJ:-}" ]]; then
-    zellij pipe --plugin "https://github.com/mostafaqanbaryan/zellij-switch/releases/download/0.2.1/zellij-switch.wasm" -- "--session \"$target\""
+    zellij action switch-session "$target"
   else
     exec zellij attach "$target"
   fi
 
 elif [ -d "$target" ]; then
   start_session_in_dir "$target"
+
+elif [[ "$target" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+  # A bare owner/repo slug (not an existing dir) — clone it like a gh: pick.
+  clone_and_start "$target"
 
 else
   echo "Error: '$target' is neither a repo, a remote URL, an active session, nor a valid directory." >&2

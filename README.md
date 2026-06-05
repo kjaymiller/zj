@@ -83,6 +83,21 @@ Selecting a `gh:` entry clones the repo into `$ZJ_REPOS_DIR` (default `~/project
 if it isn't there yet, then opens a session named after the repo (cloning slugs
 with `gh repo clone`).
 
+#### Repos not in your orgs
+
+To grab a one-off repo that isn't owned by a configured org, pass its GitHub URL
+(or `owner/repo` slug) straight to `zj` — it clones and opens it exactly like a
+`gh:` pick, no config needed:
+
+```sh
+zj https://github.com/zellij-org/zellij      # https URL
+zj git@github.com:zellij-org/zellij.git      # ssh URL
+zj zellij-org/zellij                         # owner/repo slug
+```
+
+`https://`/`git@` GitHub URLs are recognized as repos to clone; any other
+`https://` argument is treated as a remote web session.
+
 Override the owners file with `$ZJ_ORGS_FILE` and the clone base dir with
 `$ZJ_REPOS_DIR`. GraphQL caps results at 100 repos per owner.
 
@@ -113,12 +128,17 @@ When unset (or the file is missing), `zj` attaches without `--ca-cert`.
 
 ## How it works
 
-| Selection            | Action                                                                 |
+`zj` with no arguments opens the picker; `zj <target>` skips the picker and acts
+on `<target>` directly (handy for a repo that isn't in your configured orgs).
+Either way, the selection/argument is dispatched as:
+
+| Selection / argument | Action                                                                 |
 |----------------------|------------------------------------------------------------------------|
-| `http(s)://…` URL     | `zellij attach <url> --token <fnox> --remember [--ca-cert <ZJ_CA_CERT>]` |
-| active session       | attach (or hot-switch via the `zellij-switch` plugin when already inside zellij) |
-| directory            | create/attach a session named after the directory, opened there        |
 | `gh:owner/repo`       | clone into `$ZJ_REPOS_DIR` if needed, then open a session there         |
+| GitHub repo URL / slug | `https://github.com/owner/repo`, `git@github.com:owner/repo`, or a bare `owner/repo` slug — clone if needed, then open a session there |
+| other `http(s)://…` URL | `zellij attach <url> --token <fnox> --remember [--ca-cert <ZJ_CA_CERT>]` (remote web session) |
+| active session       | attach (or hot-switch via `zellij action switch-session` when already inside zellij) |
+| directory            | create/attach a session named after the directory, opened there        |
 
 ## Environment variables
 
