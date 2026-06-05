@@ -146,10 +146,12 @@ When you run `zj` from inside zellij, bind it to a **floating pane** so the pick
 overlays your current layout and tears itself down the moment you pick something.
 Add this to your zellij config (`~/.config/zellij/config.kdl`):
 
+
 ```kdl
 keybinds {
-    shared_except "locked" {
+    locked {
         bind "Ctrl y" {
+            SwitchToMode "Normal"
             Run "zj" {
                 floating true
                 close_on_exit true
@@ -159,12 +161,10 @@ keybinds {
 }
 ```
 
-`close_on_exit true` is what makes cleanup seamless: `zj` switches your client to
-the chosen session and then exits, so the floating pane closes automatically once
-the switch has already moved your view away — no leftover picker pane, nothing to
-dismiss by hand. (You can't close the floating pane *before* switching — that
-would kill `zj` mid-run — but you don't need to: switch first, let the pane
-auto-close on exit.)
+Keep this alongside the `shared_except "locked"` block above if you want the key
+to work in every mode: `shared_except` covers the unlocked modes, and the `locked`
+block adds the unlock-then-run behavior for that one mode.
+
 
 ## Environment variables
 
