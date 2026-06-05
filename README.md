@@ -1,6 +1,6 @@
 # zj
 
-A `gum`-powered fuzzy switcher for [zellij](https://zellij.dev). One keystroke to jump to:
+An `fzf`-powered fuzzy switcher for [zellij](https://zellij.dev). One keystroke to jump to:
 
 - an **active local session** (cyan),
 - a **zoxide-tracked directory** — opens/creates a session there (blue),
@@ -25,7 +25,7 @@ GitHub releases:
 ```
 
 It installs into `~/.local/bin` by default; override with `ZJ_BIN_DIR`. The
-required tools are `zellij`, `zoxide`, `gum`, and `gh`; tools already on your
+required tools are `zellij`, `zoxide`, `fzf`, and `gh`; tools already on your
 `PATH` are left untouched. Binaries are matched to your OS/arch automatically
 (macOS and Linux, x86_64 and arm64); set `GITHUB_TOKEN` to avoid the
 unauthenticated GitHub API rate limit.

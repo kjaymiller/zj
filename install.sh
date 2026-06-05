@@ -25,7 +25,7 @@ SRC="$SCRIPT_DIR/zj"
 WITH_FNOX=false
 
 # Required at runtime; fnox is optional (token resolution only) and opt-in.
-REQUIRED=(zellij zoxide gum gh)
+REQUIRED=(zellij zoxide fzf gh)
 
 # --- pretty output -------------------------------------------------------------
 
@@ -61,7 +61,7 @@ repo_for() {
   case "$1" in
     zellij) echo "zellij-org/zellij" ;;
     zoxide) echo "ajeetdsouza/zoxide" ;;
-    gum)    echo "charmbracelet/gum" ;;
+    fzf)    echo "junegunn/fzf" ;;
     gh)     echo "cli/cli" ;;
     fnox)   echo "jdx/fnox" ;;
   esac
@@ -73,14 +73,14 @@ detect_platform() {
   os="$(uname -s)"; machine="$(uname -m)"
 
   case "$machine" in
-    arm64|aarch64) RUST_CPU=aarch64; GO_ARCH=arm64; GUM_ARCH=arm64 ;;
-    x86_64|amd64)  RUST_CPU=x86_64;  GO_ARCH=amd64; GUM_ARCH=x86_64 ;;
+    arm64|aarch64) RUST_CPU=aarch64; GO_ARCH=arm64 ;;
+    x86_64|amd64)  RUST_CPU=x86_64;  GO_ARCH=amd64 ;;
     *) die "unsupported architecture: $machine" ;;
   esac
 
   case "$os" in
-    Darwin) RUST_OS=apple-darwin;       GH_OS=macOS; GUM_OS=Darwin; PLATFORM=macOS ;;
-    Linux)  RUST_OS=unknown-linux-musl; GH_OS=linux; GUM_OS=Linux;  PLATFORM=Linux ;;
+    Darwin) RUST_OS=apple-darwin;       GH_OS=macOS; FZF_OS=darwin; PLATFORM=macOS ;;
+    Linux)  RUST_OS=unknown-linux-musl; GH_OS=linux; FZF_OS=linux;  PLATFORM=Linux ;;
     *) die "unsupported OS: $os" ;;
   esac
 }
@@ -91,7 +91,7 @@ asset_match() {
     zellij) echo "zellij-${RUST_CPU}-${RUST_OS}\.tar\.gz$" ;;
     zoxide) echo "zoxide-.*-${RUST_CPU}-${RUST_OS}\.tar\.gz$" ;;
     fnox)   echo "fnox-${RUST_CPU}-${RUST_OS}\.tar\.gz$" ;;
-    gum)    echo "_${GUM_OS}_${GUM_ARCH}\.tar\.gz$" ;;
+    fzf)    echo "fzf-.*-${FZF_OS}_${GO_ARCH}\.tar\.gz$" ;;
     gh)     echo "_${GH_OS}_${GO_ARCH}\.(tar\.gz|zip)$" ;;
   esac
 }
@@ -139,8 +139,8 @@ install_tool() {
       tar -xzf "$file" -C "$tmp" ;;
   esac
 
-  # Binary may sit at the top level (zellij, zoxide, fnox), in a subdir (gum),
-  # or under bin/ (gh) — find it by name wherever it landed.
+  # Binary may sit at the top level (zellij, zoxide, fzf, fnox) or under bin/
+  # (gh) — find it by name wherever it landed.
   bin="$(find "$tmp" -type f -name "$tool" 2>/dev/null | head -1)"
   [ -z "$bin" ] && { miss "$tool — '$tool' binary not found in archive"; rm -rf "$tmp"; return 1; }
 
