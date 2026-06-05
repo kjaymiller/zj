@@ -180,6 +180,19 @@ get_token() {
   printf '%s' "$token"
 }
 
+# Derive a short name for a remote URL: the last non-empty path segment (the
+# zellij web-session name, e.g. `homelab` from https://host/homelab), falling
+# back to the host if there's no path.
+remote_session_name() {
+  local url="$1" rest host seg
+  rest="${url#*://}"     # strip scheme
+  host="${rest%%/*}"     # host[:port]
+  rest="${rest#"$host"}" # remaining path (may be empty)
+  rest="${rest%/}"       # drop a trailing slash
+  seg="${rest##*/}"      # last path segment
+  if [ -n "$seg" ]; then printf '%s' "$seg"; else printf '%s' "$host"; fi
+}
+
 attach_remote() {
   local url="$1" token
   token="$(get_token)" || { echo "No token provided; aborting." >&2; exit 1; }
@@ -189,7 +202,24 @@ attach_remote() {
     args+=(--ca-cert "$CA_CERT")
   fi
 
-  exec zellij attach "${args[@]}"
+  if [[ -n "${ZELLIJ:-}" ]]; then
+    # Already inside zellij: a plain `zellij attach` would nest the remote into
+    # the current pane, hijacking it. There's no `switch-session` for a remote
+    # URL, so host the remote in its own local session — a switchable sibling of
+    # your other sessions — and switch the client to it. Reuse it if it already
+    # exists (re-selecting the remote jumps back to its session).
+    local name
+    name="$(remote_session_name "$url")"
+    if ! list_local_sessions | grep -Fxq "$name"; then
+      create_session_running "$name" zellij attach "${args[@]}"
+      zellij action switch-session "$name"
+      drop_default_tab "$name"
+    else
+      zellij action switch-session "$name"
+    fi
+  else
+    exec zellij attach "${args[@]}"
+  fi
 }
 
 # --- session / repo helpers ---------------------------------------------------
@@ -210,6 +240,21 @@ create_session_rooted() {
     sleep 0.1
   done
   zellij --session "$name" action new-tab --cwd "$dir_abs" --name "$name"
+}
+
+# Create a detached local session named $1 whose working tab runs a command
+# ($2 onward). Mirrors create_session_rooted, but the tab hosts a command (e.g. a
+# remote `zellij attach`) rather than being rooted at a directory. The stray
+# default tab is dropped later by drop_default_tab once a client is attached.
+create_session_running() {
+  local name="$1" _; shift
+  zellij attach -c "$name" -b
+  # Wait for the server to register the new session before acting on it.
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    list_local_sessions | grep -Fxq "$name" && break
+    sleep 0.1
+  done
+  zellij --session "$name" action new-tab --name "$name" -- "$@"
 }
 
 # Close the stray default first tab left by create_session_rooted. Only effective
