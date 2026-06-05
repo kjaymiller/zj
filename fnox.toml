@@ -14,7 +14,7 @@ type = "1password"
 vault = "default"
 
 [secrets]
-ZELLIJ_WEB_TOKEN = { provider = "op", value = "op://Private/Zellij Web/credential" }
+ZELLIJ_WEB_TOKEN= { provider = "op", value = "cf5870eb-54f7-4732-8df5-753948ffc43d" }
 # Optional: a GitHub token (PAT) for listing org/owner repos. Omit to use gh's
 # own login instead.
 GH_API_TOKEN = { provider = "op", value = "op://Private/GitHub API/credential" }

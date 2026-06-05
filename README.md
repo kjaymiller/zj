@@ -166,6 +166,32 @@ dismiss by hand. (You can't close the floating pane *before* switching — that
 would kill `zj` mid-run — but you don't need to: switch first, let the pane
 auto-close on exit.)
 
+### Launching from locked mode
+
+`shared_except "locked"` leaves the binding inactive in locked mode, so the key
+does nothing while locked. To make it work *from* locked mode, bind it inside a
+`locked` block and chain `SwitchToMode "Normal"` **before** `Run`. Zellij runs the
+actions in a `bind` block in order, so the unlock fires first and then `zj`
+launches:
+
+```kdl
+keybinds {
+    locked {
+        bind "Ctrl y" {
+            SwitchToMode "Normal"
+            Run "zj" {
+                floating true
+                close_on_exit true
+            }
+        }
+    }
+}
+```
+
+Keep this alongside the `shared_except "locked"` block above if you want the key
+to work in every mode: `shared_except` covers the unlocked modes, and the `locked`
+block adds the unlock-then-run behavior for that one mode.
+
 ## Environment variables
 
 | Variable           | Default                                  | Purpose                              |
