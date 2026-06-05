@@ -32,42 +32,46 @@ unauthenticated GitHub API rate limit.
 
 `fnox` is **optional** and is not installed unless you pass `--with-fnox` — it's
 only used to resolve tokens from 1Password (see below). Without it, `zj` prompts
-for the remote token and the GitHub listing uses `gh`'s own auth. `mise` is not
-required either; it's just an alternative install path.
-
-### With mise
-
-Alternatively, [mise](https://mise.jdx.dev) can manage the tool versions:
-
-```sh
-mise install      # zellij, zoxide, gum, fnox, gh
-mise run install  # symlink ./zj -> ~/.local/bin/zj
-```
-
-(`mise run uninstall` removes the symlink.)
+for the remote token and the GitHub listing uses `gh`'s own auth.
 
 ## Configure
 
+`zj` reads its config from `~/.config/zj` (or `$XDG_CONFIG_HOME/zj`): the `orgs`
+and `remotes` files live there. The install script seeds both from the bundled
+examples on first run (it never overwrites files you've already edited), so after
+`./install.sh` you can just edit `~/.config/zj/orgs` and `~/.config/zj/remotes`.
+
 ### Remote sessions
 
-List remote web-session URLs, one per line:
+List remote web-session URLs, one per line, in `~/.config/zj/remotes`:
+
+```sh
+$EDITOR ~/.config/zj/remotes   # seeded from remotes.example by install.sh
+```
+
+If the file isn't there (e.g. `--symlink-only`), create it:
 
 ```sh
 mkdir -p ~/.config/zj
 cp remotes.example ~/.config/zj/remotes
-$EDITOR ~/.config/zj/remotes
 ```
 
 Override the location with `$ZJ_REMOTES_FILE`.
 
 ### GitHub repos
 
-List the GitHub owners/orgs whose repos you want in the picker, one login per line:
+List the GitHub owners/orgs whose repos you want in the picker, one login per
+line, in `~/.config/zj/orgs`:
+
+```sh
+$EDITOR ~/.config/zj/orgs   # seeded from orgs.example by install.sh
+```
+
+If the file isn't there, create it:
 
 ```sh
 mkdir -p ~/.config/zj
 cp orgs.example ~/.config/zj/orgs
-$EDITOR ~/.config/zj/orgs
 ```
 
 `zj` fetches every repo owned by those logins in a **single** GitHub GraphQL call

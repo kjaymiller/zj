@@ -4,4 +4,4 @@
 # Each URL is offered in the picker and attached via:
 #   zellij attach <url> --token <token> --remember [--ca-cert <ZJ_CA_CERT>]
 
-https://zellij.kjaymiller.dev/homelab
+your-network-remote.local

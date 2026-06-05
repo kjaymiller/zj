@@ -20,6 +20,7 @@
 set -uo pipefail
 
 BIN_DIR="${ZJ_BIN_DIR:-$HOME/.local/bin}"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/zj"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SRC="$SCRIPT_DIR/zj"
 WITH_FNOX=false
@@ -164,6 +165,24 @@ link_zj() {
   esac
 }
 
+# Seed ~/.config/zj with starter orgs/remotes files (never clobber existing ones).
+seed_config() {
+  mkdir -p "$CONFIG_DIR"
+  local name src dest
+  for name in orgs remotes; do
+    src="$SCRIPT_DIR/$name.example"
+    dest="$CONFIG_DIR/$name"
+    [ -f "$src" ] || continue
+    if [ -e "$dest" ]; then
+      ok "$name ${DIM}config exists → $dest${RESET}"
+    else
+      cp "$src" "$dest"
+      ok "$name ${DIM}seeded → $dest${RESET}"
+    fi
+  done
+  say "${DIM}  edit $CONFIG_DIR/orgs and $CONFIG_DIR/remotes to configure the picker${RESET}"
+}
+
 do_uninstall() {
   local link="$BIN_DIR/zj"
   if [ -L "$link" ] || [ -f "$link" ]; then
@@ -204,6 +223,10 @@ do_install() {
 
   say ""
   link_zj
+
+  say ""
+  say "${BOLD}Config${RESET} ${DIM}($CONFIG_DIR)${RESET}"
+  seed_config
 
   if [ "$failed" -gt 0 ]; then
     say ""
