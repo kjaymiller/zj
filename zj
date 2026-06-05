@@ -180,6 +180,19 @@ get_token() {
   printf '%s' "$token"
 }
 
+# Derive a short name for a remote URL: the last non-empty path segment (the
+# zellij web-session name, e.g. `homelab` from https://host/homelab), falling
+# back to the host if there's no path.
+remote_session_name() {
+  local url="$1" rest host seg
+  rest="${url#*://}"     # strip scheme
+  host="${rest%%/*}"     # host[:port]
+  rest="${rest#"$host"}" # remaining path (may be empty)
+  rest="${rest%/}"       # drop a trailing slash
+  seg="${rest##*/}"      # last path segment
+  if [ -n "$seg" ]; then printf '%s' "$seg"; else printf '%s' "$host"; fi
+}
+
 attach_remote() {
   local url="$1" token
   token="$(get_token)" || { echo "No token provided; aborting." >&2; exit 1; }
@@ -189,7 +202,17 @@ attach_remote() {
     args+=(--ca-cert "$CA_CERT")
   fi
 
-  exec zellij attach "${args[@]}"
+  if [[ -n "${ZELLIJ:-}" ]]; then
+    # Already inside zellij: a plain `zellij attach` would nest the remote into
+    # the current pane, hijacking it. There's no `switch-session` for a remote
+    # URL, so spawn the attach in its own tab — the remote gets a full-screen
+    # space of its own, the closest analog to a new session within this client.
+    # --close-on-exit drops the tab when you detach from the remote.
+    zellij action new-tab --name "$(remote_session_name "$url")" --close-on-exit \
+      -- zellij attach "${args[@]}"
+  else
+    exec zellij attach "${args[@]}"
+  fi
 }
 
 # --- session / repo helpers ---------------------------------------------------
