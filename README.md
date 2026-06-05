@@ -11,7 +11,9 @@ An `fzf`-powered fuzzy switcher for [zellij](https://zellij.dev). One keystroke 
 
 Remote sessions are attached with `zellij attach <url> --token …`. The token is resolved through [fnox](https://github.com/jdx/fnox), which can serve it straight from 1Password.
 
-[![See it in Action](https://i.ytimg.com/vi/h2kwzpY5-sA/hqdefault.jpg?sqp=-oaymwE2CNACELwBSFXyq4qpAygIARUAAIhCGAFwAcABBvABAfgBkAmAAtAFigIMCAAQARhPIFYoZTAP&rs=AOn4CLAkBs2oSOKvrScj3u4LmgIxj0M2yQ)](https://youtu.be/h2kwzpY5-sA)
+Watch the video below for a walkthrough on how to use it
+
+[![ZJ in Action](https://i.ytimg.com/vi/h2kwzpY5-sA/hqdefault.jpg?sqp=-oaymwE2CNACELwBSFXyq4qpAygIARUAAIhCGAFwAcABBvABAfgBkAmAAtAFigIMCAAQARhPIFYoZTAP&rs=AOn4CLAkBs2oSOKvrScj3u4LmgIxj0M2yQ)](https://youtu.be/h2kwzpY5-sA)
 
 ## Install
 
