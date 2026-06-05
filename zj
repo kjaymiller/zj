@@ -205,11 +205,18 @@ attach_remote() {
   if [[ -n "${ZELLIJ:-}" ]]; then
     # Already inside zellij: a plain `zellij attach` would nest the remote into
     # the current pane, hijacking it. There's no `switch-session` for a remote
-    # URL, so spawn the attach in its own tab — the remote gets a full-screen
-    # space of its own, the closest analog to a new session within this client.
-    # --close-on-exit drops the tab when you detach from the remote.
-    zellij action new-tab --name "$(remote_session_name "$url")" --close-on-exit \
-      -- zellij attach "${args[@]}"
+    # URL, so host the remote in its own local session — a switchable sibling of
+    # your other sessions — and switch the client to it. Reuse it if it already
+    # exists (re-selecting the remote jumps back to its session).
+    local name
+    name="$(remote_session_name "$url")"
+    if ! list_local_sessions | grep -Fxq "$name"; then
+      create_session_running "$name" zellij attach "${args[@]}"
+      zellij action switch-session "$name"
+      drop_default_tab "$name"
+    else
+      zellij action switch-session "$name"
+    fi
   else
     exec zellij attach "${args[@]}"
   fi
@@ -233,6 +240,21 @@ create_session_rooted() {
     sleep 0.1
   done
   zellij --session "$name" action new-tab --cwd "$dir_abs" --name "$name"
+}
+
+# Create a detached local session named $1 whose working tab runs a command
+# ($2 onward). Mirrors create_session_rooted, but the tab hosts a command (e.g. a
+# remote `zellij attach`) rather than being rooted at a directory. The stray
+# default tab is dropped later by drop_default_tab once a client is attached.
+create_session_running() {
+  local name="$1" _; shift
+  zellij attach -c "$name" -b
+  # Wait for the server to register the new session before acting on it.
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    list_local_sessions | grep -Fxq "$name" && break
+    sleep 0.1
+  done
+  zellij --session "$name" action new-tab --name "$name" -- "$@"
 }
 
 # Close the stray default first tab left by create_session_rooted. Only effective

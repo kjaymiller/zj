@@ -136,7 +136,7 @@ Either way, the selection/argument is dispatched as:
 |----------------------|------------------------------------------------------------------------|
 | `gh:owner/repo`       | clone into `$ZJ_REPOS_DIR` if needed, then open a session there         |
 | GitHub repo URL / slug | `https://github.com/owner/repo`, `git@github.com:owner/repo`, or a bare `owner/repo` slug — clone if needed, then open a session there |
-| other `http(s)://…` URL | `zellij attach <url> --token <fnox> --remember [--ca-cert <ZJ_CA_CERT>]` (remote web session); when already inside zellij it opens in a new tab instead of hijacking the current pane |
+| other `http(s)://…` URL | `zellij attach <url> --token <fnox> --remember [--ca-cert <ZJ_CA_CERT>]` (remote web session); when already inside zellij it's hosted in (or switched to) a dedicated local session named after the URL, rather than hijacking the current pane |
 | active session       | attach (or hot-switch via `zellij action switch-session` when already inside zellij) |
 | directory            | create/attach a session named after the directory, opened there        |
 
