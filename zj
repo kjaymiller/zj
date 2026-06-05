@@ -16,8 +16,10 @@
 #   - GitHub repos for configured owners    (green)    shown as gh:owner/repo
 #
 # Remote sessions are attached with `zellij attach <url> --token ...`. The token
-# is resolved via fnox (which can serve it from 1Password); if fnox has no value
-# you are prompted, and may cache it back into fnox.
+# is resolved via fnox (backed by whatever provider you've configured — age,
+# 1Password, etc.); if fnox has no value you are prompted, and may cache it back
+# into fnox's global config (~/.config/fnox/config.toml) so it's found from any
+# directory. This needs a fnox provider configured (`fnox provider add ...`).
 #
 # Config (all optional, via env):
 #   ZJ_REMOTES_FILE  path to a newline-separated list of remote session URLs
@@ -170,10 +172,14 @@ get_token() {
   printf 'Cache this token via fnox (%s)? [y/N] ' "$TOKEN_KEY" >/dev/tty
   IFS= read -r reply </dev/tty
   if [[ "$reply" == [Yy]* ]]; then
-    if printf '%s' "$token" | fnox set "$TOKEN_KEY" >/dev/null 2>&1; then
+    # --global writes to ~/.config/fnox/config.toml so the token is found no
+    # matter which directory zj is later run from. Without it, fnox would drop a
+    # fnox.toml into the current directory, and the next zj run elsewhere
+    # wouldn't see it — so you'd be prompted every time.
+    if printf '%s' "$token" | fnox set --global "$TOKEN_KEY" >/dev/null 2>&1; then
       echo "Cached token in fnox as $TOKEN_KEY." >&2
     else
-      echo "Could not cache token (is fnox.toml configured?). Continuing." >&2
+      echo "Could not cache token (is a fnox provider configured?). Continuing." >&2
     fi
   fi
 
