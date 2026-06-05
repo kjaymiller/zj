@@ -140,6 +140,32 @@ Either way, the selection/argument is dispatched as:
 | active session       | attach (or hot-switch via `zellij action switch-session` when already inside zellij) |
 | directory            | create/attach a session named after the directory, opened there        |
 
+## Launching from a keybinding (floating pane)
+
+When you run `zj` from inside zellij, bind it to a **floating pane** so the picker
+overlays your current layout and tears itself down the moment you pick something.
+Add this to your zellij config (`~/.config/zellij/config.kdl`):
+
+```kdl
+keybinds {
+    shared_except "locked" {
+        bind "Ctrl y" {
+            Run "zj" {
+                floating true
+                close_on_exit true
+            }
+        }
+    }
+}
+```
+
+`close_on_exit true` is what makes cleanup seamless: `zj` switches your client to
+the chosen session and then exits, so the floating pane closes automatically once
+the switch has already moved your view away — no leftover picker pane, nothing to
+dismiss by hand. (You can't close the floating pane *before* switching — that
+would kill `zj` mid-run — but you don't need to: switch first, let the pane
+auto-close on exit.)
+
 ## Environment variables
 
 | Variable           | Default                                  | Purpose                              |
