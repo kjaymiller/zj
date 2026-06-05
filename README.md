@@ -1,5 +1,7 @@
 # zj
 
+![zj session picker in a floating window](https://jmblogstorrage.blob.core.windows.net/media/zj-ac64196a.png)
+
 An `fzf`-powered fuzzy switcher for [zellij](https://zellij.dev). One keystroke to jump to:
 
 - an **active local session** (cyan),
@@ -8,6 +10,10 @@ An `fzf`-powered fuzzy switcher for [zellij](https://zellij.dev). One keystroke 
 - a **GitHub repo** for any owner/org you list (green, shown as `gh:owner/repo`) — clones it on demand, then opens a session there.
 
 Remote sessions are attached with `zellij attach <url> --token …`. The token is resolved through [fnox](https://github.com/jdx/fnox), which can serve it straight from 1Password.
+
+Watch the video below for a walkthrough on how to use it
+
+[![ZJ in Action](https://i.ytimg.com/vi/h2kwzpY5-sA/hqdefault.jpg?sqp=-oaymwE2CNACELwBSFXyq4qpAygIARUAAIhCGAFwAcABBvABAfgBkAmAAtAFigIMCAAQARhPIFYoZTAP&rs=AOn4CLAkBs2oSOKvrScj3u4LmgIxj0M2yQ)](https://youtu.be/h2kwzpY5-sA)
 
 ## Install
 
@@ -178,3 +184,9 @@ block adds the unlock-then-run behavior for that one mode.
 | `ZJ_GH_LIMIT`      | `200`                                    | Max repos fetched per owner (GraphQL caps at 100) |
 | `ZJ_GH_CACHE_TTL`  | `60`                                     | Minutes to cache repo lists (`0` disables) |
 | `ZJ_GH_TOKEN_KEY`  | `GH_API_TOKEN`                           | fnox secret name for the GitHub GraphQL token |
+
+
+## Acknowledgements
+
+- This project is heavily built off Claude Code prompts
+- This project was entirely inspired by [Sesh](https://github.com/joshmedeski/sesh)
