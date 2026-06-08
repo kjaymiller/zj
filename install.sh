@@ -6,7 +6,7 @@
 # releases — no package manager (and no mise) required.
 #
 #   ./install.sh               install missing dependencies + symlink zj
-#   ./install.sh --with-fnox    also install fnox (optional; 1Password tokens)
+#   ./install.sh --with-fnox    also install fnox (optional; age-backed tokens)
 #   ./install.sh --symlink-only just symlink zj (leave dependencies alone)
 #   ./install.sh --uninstall    remove the zj symlink
 #   ./install.sh --help         show this help
@@ -47,7 +47,7 @@ usage() {
   say "install.sh — native installer for zj on macOS and Linux."
   say ""
   say "  ./install.sh                install missing dependencies + symlink zj"
-  say "  ./install.sh --with-fnox    also install fnox (optional; 1Password tokens)"
+  say "  ./install.sh --with-fnox    also install fnox (optional; age-backed tokens)"
   say "  ./install.sh --symlink-only just symlink zj (leave dependencies alone)"
   say "  ./install.sh --uninstall    remove the zj symlink"
   say "  ./install.sh --help         show this help"
@@ -218,7 +218,7 @@ do_install() {
   elif [ "$WITH_FNOX" = true ]; then
     install_tool fnox || say "  ${DIM}(fnox is optional — continuing without it)${RESET}"
   else
-    say "  ${DIM}- fnox not installed (optional; pass --with-fnox for 1Password-backed tokens)${RESET}"
+    say "  ${DIM}- fnox not installed (optional; pass --with-fnox for age-backed tokens)${RESET}"
   fi
 
   say ""
