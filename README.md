@@ -9,7 +9,7 @@ An `fzf`-powered fuzzy switcher for [zellij](https://zellij.dev). One keystroke 
 - a **remote web session** over zellij's web server (magenta), e.g. `https://zellij.kjaymiller.dev/homelab`, or
 - a **GitHub repo** for any owner/org you list (green, shown as `gh:owner/repo`) — clones it on demand, then opens a session there.
 
-Remote sessions are attached with `zellij attach <url> --token …`. The token is resolved through [fnox](https://github.com/jdx/fnox), which can serve it straight from 1Password.
+Remote sessions are attached with `zellij attach <url> --token …`. The token is resolved through [fnox](https://github.com/jdx/fnox), which can serve it from an [age](https://github.com/FiloSottile/age)-encrypted store.
 
 Watch the video below for a walkthrough on how to use it
 
@@ -25,7 +25,7 @@ GitHub releases:
 
 ```sh
 ./install.sh                # install missing dependencies + symlink zj
-./install.sh --with-fnox    # also install fnox (optional; 1Password tokens)
+./install.sh --with-fnox    # also install fnox (optional; age-backed tokens)
 ./install.sh --symlink-only # just symlink zj, leave dependencies alone
 ./install.sh --uninstall    # remove the symlink
 ```
@@ -37,7 +37,7 @@ required tools are `zellij`, `zoxide`, `fzf`, and `gh`; tools already on your
 unauthenticated GitHub API rate limit.
 
 `fnox` is **optional** and is not installed unless you pass `--with-fnox` — it's
-only used to resolve tokens from 1Password (see below). Without it, `zj` prompts
+only used to resolve tokens from an age-encrypted store (see below). Without it, `zj` prompts
 for the remote token and the GitHub listing uses `gh`'s own auth.
 
 ## Configure
@@ -113,11 +113,12 @@ fine-grained token with `repo`/read access) — `zj` exports it as `GH_TOKEN` fo
 the call. Override the secret name with `$ZJ_GH_TOKEN_KEY`. When fnox has no
 value, `gh`'s normal auth (or an existing `$GH_TOKEN`) is used.
 
-### Token (fnox + 1Password)
+### Token (fnox + age)
 
-`zj` fetches the remote auth token via `fnox get ZELLIJ_WEB_TOKEN`. Point fnox at
-your 1Password item (see `fnox.toml` for a template) so the token is served on
-demand. If fnox has no value, `zj` prompts and offers to cache it back into fnox.
+`zj` fetches the remote auth token via `fnox get ZELLIJ_WEB_TOKEN`. Configure a
+fnox provider backed by [age](https://github.com/FiloSottile/age) (`fnox provider
+add …`) so the token is served on demand. If fnox has no value, `zj` prompts and
+offers to cache it back into fnox.
 
 Override the secret name with `$ZJ_TOKEN_KEY`.
 
