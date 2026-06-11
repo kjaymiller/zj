@@ -147,7 +147,8 @@ else
     list_remotes          | awk 'NF {printf "\033[35m%s\033[0m\n", $0}'
     zoxide query -l       | awk 'NF {printf "\033[34m%s\033[0m\n", $0}'
     list_repos            | awk 'NF {printf "\033[32mgh:%s\033[0m\n", $0}'
-  } | awk '!seen[$0]++' | fzf --ansi --print-query --layout=reverse \
+  } | awk '!seen[$0]++' | fzf --ansi --print-query --layout=reverse --info=inline \
+        --color='header:italic:cyan' \
         --header='Enter on a match to open it · type a new name + Enter to create it' \
         --prompt='Pick a session, project, remote, or repo… ')
   fzf_status=$?
@@ -435,7 +436,9 @@ elif [[ "$target" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
   # asks which the user meant, since both readings are equally plausible there.
   if [ "$from_query" -eq 1 ]; then
     choice=$(printf 'Clone GitHub repo %s\nCreate new dir %s\n' "$target" "$target" \
-      | fzf --layout=reverse --prompt="'$target' — clone or create? ")
+      | fzf --layout=reverse --info=inline \
+          --header="'$target' looks like both a repo and a path — pick one (Esc to cancel)" \
+          --prompt="clone or create? ")
     case "$choice" in
       Clone*)  clone_and_start "$target" ;;
       Create*) create_and_start "$target" ;;
