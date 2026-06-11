@@ -212,16 +212,26 @@ attach_remote() {
     # Already inside zellij: a plain `zellij attach` would nest the remote into
     # the current pane, hijacking it. There's no `switch-session` for a remote
     # URL, so host the remote in its own local session — a switchable sibling of
-    # your other sessions — and switch the client to it. Reuse it if it already
-    # exists (re-selecting the remote jumps back to its session).
+    # your other sessions — and switch the client to it.
     local name
     name="$(remote_session_name "$url")"
-    if ! list_local_sessions | grep -Fxq "$name"; then
+    if list_local_sessions | grep -Fxq "$name" && session_hosts_remote "$name"; then
+      # The session already hosts a live remote attach — jump straight to it.
+      zellij action switch-session "$name"
+    elif list_local_sessions | grep -Fxq "$name"; then
+      # The session exists but its remote `zellij attach` has exited (e.g. you
+      # detached from the remote), leaving only local panes. Re-attach the
+      # remote in a fresh tab and switch to it, rather than dumping you into a
+      # dead local shell (issue #17). We add a tab instead of recreating the
+      # session so anything else you opened there survives.
+      zellij action switch-session "$name"
+      zellij --session "$name" action new-tab --name "$name" -- zellij attach "${args[@]}"
+    else
+      # First time: spin up a sibling session hosting the remote, switch to it,
+      # and drop the stray default tab create_session_running leaves behind.
       create_session_running "$name" zellij attach "${args[@]}"
       zellij action switch-session "$name"
       drop_default_tab "$name"
-    else
-      zellij action switch-session "$name"
     fi
   else
     exec zellij attach "${args[@]}"
@@ -273,6 +283,16 @@ drop_default_tab() {
     zellij --session "$name" action go-to-tab 1
     zellij --session "$name" action close-tab
   fi
+}
+
+# True if local session $1 currently hosts a live remote `zellij attach` pane.
+# A zj-created remote-host session degrades to plain shell panes once its attach
+# command exits (e.g. you detach from the remote), so the session merely
+# existing doesn't mean the remote is still open — we must re-attach instead of
+# switching into a dead shell (issue #17).
+session_hosts_remote() {
+  zellij --session "$1" action dump-layout 2>/dev/null \
+    | grep -A2 'command="zellij"' | grep -q '"attach"'
 }
 
 # Open (or hot-switch to) a zellij session rooted at a directory.
