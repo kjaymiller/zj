@@ -131,25 +131,44 @@ EOF
   fi
 }
 
+# Set when `target` came from a picker query that matched nothing, so the
+# dispatch below knows it may create a brand-new project dir rather than erroring.
+from_query=0
+
 # An explicit argument bypasses the picker — useful for a GitHub URL/slug or any
 # other target that isn't (or can't be) in the picker list.
 if [ "$#" -gt 0 ]; then
   target="$1"
 else
+  # --print-query makes fzf echo the typed query as the first output line, so we
+  # can still act on it when it matches nothing in the list.
   raw_target=$({
     list_local_sessions | awk 'NF {printf "\033[36m%s\033[0m\n", $0}'
     list_remotes          | awk 'NF {printf "\033[35m%s\033[0m\n", $0}'
     zoxide query -l       | awk 'NF {printf "\033[34m%s\033[0m\n", $0}'
     list_repos            | awk 'NF {printf "\033[32mgh:%s\033[0m\n", $0}'
-  } | awk '!seen[$0]++' | fzf --ansi --layout=reverse \
+  } | awk '!seen[$0]++' | fzf --ansi --print-query --layout=reverse \
         --prompt='Pick a session, project, remote, or repo… ')
+  fzf_status=$?
 
-  # Exit if nothing was selected (user pressed Esc).
-  [ -z "$raw_target" ] && exit 0
+  # 130 = user cancelled (Esc / Ctrl-C); leave without doing anything.
+  [ "$fzf_status" -eq 130 ] && exit 0
 
-  # fzf --ansi already drops the color codes from its output; strip again
-  # defensively so downstream matching never sees an escape sequence.
-  target=$(printf '%s' "$raw_target" | awk '{gsub(/\033\[[0-9;]*m/, ""); print}')
+  # With --print-query the first line is the typed query and the second (if any)
+  # is the chosen item. On a match we use the selection; otherwise we fall back
+  # to the query and let dispatch turn it into a new project dir.
+  query=$(printf '%s\n' "$raw_target" | sed -n '1p')
+  selection=$(printf '%s\n' "$raw_target" | sed -n '2p')
+
+  if [ -n "$selection" ]; then
+    # fzf --ansi already drops the color codes from its output; strip again
+    # defensively so downstream matching never sees an escape sequence.
+    target=$(printf '%s' "$selection" | awk '{gsub(/\033\[[0-9;]*m/, ""); print}')
+  else
+    [ -z "$query" ] && exit 0
+    target="$query"
+    from_query=1
+  fi
 fi
 
 # --- token handling (remote only) ---------------------------------------------
@@ -303,6 +322,29 @@ start_session_in_dir() {
   fi
 }
 
+# Slugify arbitrary text into a safe directory name: lowercase, non-alphanumerics
+# collapsed to single hyphens, leading/trailing hyphens trimmed.
+slugify() {
+  printf '%s' "$1" \
+    | tr '[:upper:]' '[:lower:]' \
+    | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
+}
+
+# Make a new project directory under $REPOS_DIR named after the (slugified) typed
+# query, then open a session in it. This is the fallthrough for a picker query
+# that matched nothing — instead of erroring, scaffold a fresh project.
+create_and_start() {
+  local slug dest
+  slug="$(slugify "$1")"
+  [ -z "$slug" ] && { echo "Error: '$1' has no usable directory name." >&2; exit 1; }
+  dest="$REPOS_DIR/$slug"
+  if [ ! -d "$dest" ]; then
+    echo "Creating new project $dest ..." >&2
+    mkdir -p "$dest" || { echo "Could not create $dest" >&2; exit 1; }
+  fi
+  start_session_in_dir "$dest"
+}
+
 # If $1 is a GitHub repo URL (https or ssh/scp form), echo its `owner/repo` slug
 # and return 0; otherwise return 1. This is what lets a github.com URL be cloned
 # rather than treated as a remote zellij web session (both are https://).
@@ -375,6 +417,11 @@ elif [ -d "$target" ]; then
 elif [[ "$target" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
   # A bare owner/repo slug (not an existing dir) — clone it like a gh: pick.
   clone_and_start "$target"
+
+elif [ "$from_query" -eq 1 ]; then
+  # A typed picker query that matched nothing and isn't a URL/slug/session/dir —
+  # treat it as the name of a new project: make a slugified dir and open it.
+  create_and_start "$target"
 
 else
   echo "Error: '$target' is neither a repo, a remote URL, an active session, nor a valid directory." >&2
