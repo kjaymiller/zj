@@ -148,6 +148,7 @@ else
     zoxide query -l       | awk 'NF {printf "\033[34m%s\033[0m\n", $0}'
     list_repos            | awk 'NF {printf "\033[32mgh:%s\033[0m\n", $0}'
   } | awk '!seen[$0]++' | fzf --ansi --print-query --layout=reverse \
+        --header='Enter on a match to open it · type a new name + Enter to create it' \
         --prompt='Pick a session, project, remote, or repo… ')
   fzf_status=$?
 
