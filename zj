@@ -330,12 +330,25 @@ slugify() {
     | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
 }
 
+# Slugify a possibly-nested path, preserving `/` separators so a typed
+# `parent/subdir` becomes nested dirs rather than a single `parent-subdir`.
+# Each segment is slugified independently; empty segments are dropped.
+slugify_path() {
+  local IFS='/' seg out=""
+  for seg in $1; do
+    seg="$(slugify "$seg")"
+    [ -z "$seg" ] && continue
+    out="${out:+$out/}$seg"
+  done
+  printf '%s' "$out"
+}
+
 # Make a new project directory under $REPOS_DIR named after the (slugified) typed
 # query, then open a session in it. This is the fallthrough for a picker query
 # that matched nothing — instead of erroring, scaffold a fresh project.
 create_and_start() {
   local slug dest
-  slug="$(slugify "$1")"
+  slug="$(slugify_path "$1")"
   [ -z "$slug" ] && { echo "Error: '$1' has no usable directory name." >&2; exit 1; }
   dest="$REPOS_DIR/$slug"
   if [ ! -d "$dest" ]; then
@@ -415,8 +428,21 @@ elif [ -d "$target" ]; then
   start_session_in_dir "$target"
 
 elif [[ "$target" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
-  # A bare owner/repo slug (not an existing dir) — clone it like a gh: pick.
-  clone_and_start "$target"
+  # A bare `owner/repo` slug. This is ambiguous: it could be a GitHub repo to
+  # clone, or a nested `parent/subdir` project to scaffold. An explicit arg
+  # (`zj owner/repo`) keeps the documented clone behavior; a typed picker query
+  # asks which the user meant, since both readings are equally plausible there.
+  if [ "$from_query" -eq 1 ]; then
+    choice=$(printf 'Clone GitHub repo %s\nCreate new dir %s\n' "$target" "$target" \
+      | fzf --layout=reverse --prompt="'$target' — clone or create? ")
+    case "$choice" in
+      Clone*)  clone_and_start "$target" ;;
+      Create*) create_and_start "$target" ;;
+      *)       exit 0 ;;   # Esc / Ctrl-C — do nothing.
+    esac
+  else
+    clone_and_start "$target"
+  fi
 
 elif [ "$from_query" -eq 1 ]; then
   # A typed picker query that matched nothing and isn't a URL/slug/session/dir —
