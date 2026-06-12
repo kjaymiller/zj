@@ -248,11 +248,11 @@ attach_remote() {
       zellij action switch-session "$name"
       zellij --session "$name" action new-tab --name "$name" -- zellij attach "${args[@]}"
     else
-      # First time: spin up a sibling session hosting the remote, switch to it,
-      # and drop the stray default tab create_session_running leaves behind.
+      # First time: spin up a sibling session hosting the remote and switch to
+      # it. create_session_running roots the single tab via the initial layout,
+      # so there's no stray default tab to drop.
       create_session_running "$name" zellij attach "${args[@]}"
       zellij action switch-session "$name"
-      drop_default_tab "$name"
     fi
   else
     exec zellij attach "${args[@]}"
@@ -261,49 +261,62 @@ attach_remote() {
 
 # --- session / repo helpers ---------------------------------------------------
 
-# Create a detached zellij session whose working tab is rooted at $1 (absolute
-# dir) and named $2. The zellij server roots a session's *initial* pane at its
-# OWN cwd and ignores `--default-cwd` for it, so neither a `cd` here nor
-# `--default-cwd` sets the directory. `new-tab --cwd` is the only reliable way
-# to spawn a pane in a given dir, so we create the session, then add a tab that
-# is actually rooted there. The misrooted default tab is dropped later by
-# drop_default_tab (which only works once a client is attached).
+# Escape a string for inclusion in a double-quoted KDL value (backslash, then
+# double-quote). Used to build the --layout-string passed to zellij below.
+kdl_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+# Wait (up to ~1s) for the zellij server to register a just-created session, so
+# callers can act on it (switch-session, etc.) without racing the server.
+wait_for_session() {
+  local name="$1" _
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    list_local_sessions | grep -Fxq "$name" && return 0
+    sleep 0.1
+  done
+}
+
+# Create a detached zellij session whose single working tab is rooted at $1
+# (absolute dir) and named $2. The zellij server roots a session's *initial*
+# pane at its OWN cwd and ignores `--default-cwd`, so we hand it an explicit
+# --layout-string that roots the one and only tab where we want it. Doing it in
+# the initial layout (rather than adding a second `new-tab --cwd`) means no
+# stray, misrooted default tab is ever created — so a new session opens with a
+# single tab instead of two.
 create_session_rooted() {
-  local dir_abs="$1" name="$2" _
-  zellij attach -c "$name" -b
-  # Wait for the server to register the new session before acting on it.
-  for _ in 1 2 3 4 5 6 7 8 9 10; do
-    list_local_sessions | grep -Fxq "$name" && break
-    sleep 0.1
-  done
-  zellij --session "$name" action new-tab --cwd "$dir_abs" --name "$name"
+  local dir_abs="$1" name="$2" layout
+  layout="layout {
+  tab name=\"$(kdl_escape "$name")\" {
+    pane cwd=\"$(kdl_escape "$dir_abs")\"
+  }
+}"
+  zellij --layout-string "$layout" attach -c "$name" -b
+  wait_for_session "$name"
 }
 
-# Create a detached local session named $1 whose working tab runs a command
-# ($2 onward). Mirrors create_session_rooted, but the tab hosts a command (e.g. a
-# remote `zellij attach`) rather than being rooted at a directory. The stray
-# default tab is dropped later by drop_default_tab once a client is attached.
+# Create a detached local session named $1 whose single working tab runs a
+# command ($2 onward). Mirrors create_session_rooted, but the tab hosts a command
+# (e.g. a remote `zellij attach`) rather than being rooted at a directory — and
+# likewise via the initial --layout-string, so no stray default tab is left.
 create_session_running() {
-  local name="$1" _; shift
-  zellij attach -c "$name" -b
-  # Wait for the server to register the new session before acting on it.
-  for _ in 1 2 3 4 5 6 7 8 9 10; do
-    list_local_sessions | grep -Fxq "$name" && break
-    sleep 0.1
+  local name="$1" cmd layout args_line a; shift
+  cmd="$1"; shift
+  args_line="args"
+  for a in "$@"; do
+    args_line+=" \"$(kdl_escape "$a")\""
   done
-  zellij --session "$name" action new-tab --name "$name" -- "$@"
-}
-
-# Close the stray default first tab left by create_session_rooted. Only effective
-# on a session the current client is attached to, and only if the rooted tab was
-# really added (so we never close the sole tab and kill the session). Best-effort.
-drop_default_tab() {
-  local name="$1"
-  if [ "$(zellij --session "$name" action dump-layout 2>/dev/null \
-            | grep -c 'tab name=')" -ge 2 ]; then
-    zellij --session "$name" action go-to-tab 1
-    zellij --session "$name" action close-tab
-  fi
+  # Omit the args node entirely when the command takes none.
+  [ "$#" -eq 0 ] && args_line=""
+  layout="layout {
+  tab name=\"$(kdl_escape "$name")\" {
+    pane command=\"$(kdl_escape "$cmd")\" {
+      $args_line
+    }
+  }
+}"
+  zellij --layout-string "$layout" attach -c "$name" -b
+  wait_for_session "$name"
 }
 
 # True if local session $1 currently hosts a live remote `zellij attach` pane.
@@ -328,7 +341,6 @@ start_session_in_dir() {
     if ! list_local_sessions | grep -Fxq "$session_name"; then
       create_session_rooted "$dir_abs" "$session_name"
       zellij action switch-session "$session_name"
-      drop_default_tab "$session_name"
     else
       zellij action switch-session "$session_name"
     fi
@@ -336,9 +348,8 @@ start_session_in_dir() {
     if list_local_sessions | grep -Fxq "$session_name"; then
       exec zellij attach "$session_name"
     fi
-    # New session: root a tab at the dir, then attach. We can't drop the stray
-    # default tab here (no client is attached until we exec), but attaching lands
-    # the user on the correctly-rooted tab.
+    # New session: its single tab is rooted at the dir by the initial layout, so
+    # attaching lands the user on the correctly-rooted tab with no stray tab.
     create_session_rooted "$dir_abs" "$session_name"
     exec zellij attach "$session_name"
   fi
