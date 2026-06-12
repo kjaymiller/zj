@@ -15,6 +15,17 @@ Watch the video below for a walkthrough on how to use it
 
 [![ZJ in Action](https://i.ytimg.com/vi/h2kwzpY5-sA/hqdefault.jpg?sqp=-oaymwE2CNACELwBSFXyq4qpAygIARUAAIhCGAFwAcABBvABAfgBkAmAAtAFigIMCAAQARhPIFYoZTAP&rs=AOn4CLAkBs2oSOKvrScj3u4LmgIxj0M2yQ)](https://youtu.be/h2kwzpY5-sA)
 
+## Documentation
+
+Full docs live in [`docs/`](docs/), organized in the [Diátaxis](https://diataxis.fr) style:
+
+- **[Tutorial](docs/tutorial.md)** — learn `zj` from a clean machine to your first session.
+- **[How-to guides](docs/how-to/)** — [remote sessions](docs/how-to/remote-sessions.md), [GitHub orgs](docs/how-to/github-orgs.md), and [troubleshooting](docs/how-to/troubleshooting.md).
+- **[Reference](docs/reference.md)** — env vars, config files, and the dispatch table.
+- **[Explanation](docs/explanation.md)** — how the picker and dispatch work, and why.
+
+The rest of this README is a quick-start; the docs go deeper.
+
 ## Install
 
 ### With the install script (macOS / Linux)
